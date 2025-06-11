@@ -1,0 +1,17 @@
+{
+  "grpc": {
+    "host": "localhost:50051"
+  },
+  "http": {
+    "host": "localhost:8080"
+  },
+  "pg_conf": {
+    "host": "localhost:5432",
+    "user": "user",
+    "password": "pass",
+    "database": "test_db"
+  },
+  "": {
+
+  }
+}

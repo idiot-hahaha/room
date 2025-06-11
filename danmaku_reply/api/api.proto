@@ -1,0 +1,20 @@
+syntax = "proto3";
+option go_package = "reply/api";
+
+service ReplyServer {
+  rpc Ping(PingReq) returns (PingRes);
+  rpc ReplyByGroupID(ReplyByGroupIDReq)returns (ReplyByGroupIDRes);
+}
+
+message PingReq {}
+
+message PingRes {}
+
+message ReplyByGroupIDReq {
+  int64 GroupID = 1;
+  string Question = 2;
+}
+
+message ReplyByGroupIDRes {
+  string Reply = 1;
+}

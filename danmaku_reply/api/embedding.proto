@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package embedding;
+
+option go_package = "danmaku_reply/api";
+
+message Empty{}
+
+// 请求结构：包含一句话
+message EmbeddingRequest {
+  string text = 1;
+}
+
+// 返回结构：embedding 是 float 向量
+message EmbeddingResponse {
+  repeated double embedding = 1;
+}
+
+// 服务定义
+service EmbeddingService {
+  rpc GetEmbedding(EmbeddingRequest) returns (EmbeddingResponse);
+  rpc Ping(Empty) returns (Empty);
+}
