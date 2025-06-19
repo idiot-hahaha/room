@@ -6,16 +6,19 @@ require (
 	github.com/dop251/goja v0.0.0-20250309171923-bcd7cc6bf64c
 	github.com/elliotchance/orderedmap v1.8.0
 	github.com/gin-gonic/gin v1.10.0
+	github.com/go-sql-driver/mysql v1.9.3
 	github.com/gorilla/websocket v1.5.3
 	github.com/imroc/req/v3 v3.52.1
 	github.com/lib/pq v1.10.9
 	github.com/pion/webrtc/v3 v3.3.5
+	github.com/robfig/cron/v3 v3.0.1
 	github.com/spf13/cast v1.8.0
 	google.golang.org/grpc v1.72.1
 	google.golang.org/protobuf v1.36.6
 )
 
 require (
+	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/bytedance/sonic v1.11.6 // indirect
 	github.com/bytedance/sonic/loader v0.1.1 // indirect

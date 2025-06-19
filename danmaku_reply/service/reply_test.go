@@ -11,7 +11,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"sync"
 	"testing"
 	"time"
 )
@@ -117,78 +116,25 @@ func TestEmbedding(t *testing.T) {
 	}
 }
 
-func TestSDP(t *testing.T) {
-	fmt.Println(GenSDP())
-}
-
-func TestSessionID(t *testing.T) {
-	payload := bytes.NewBufferString(fmt.Sprintf(`{"type":"offer","sdp":%s}`, GenSDP()))
-	resp, err := http.Post("https://192.168.10.204:/offer", "application/json", payload)
-	if err != nil {
-		fmt.Println("Error posting data:", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println("Error reading response body:", err)
-		return
-	}
-
-	fmt.Println("Response Status:", resp.Status)
-	fmt.Println("Response Body:", string(body))
-}
-
-func TestQuickSort(t *testing.T) {
-
-}
-
-func Cal(arr []int) (res int) {
-	sum, res := arr[0], arr[0]
-	for i := 1; i < len(arr); i++ {
-		if sum < 0 {
-			sum = 0
-		}
-		res = max(res, sum+arr[i])
-		sum += arr[i]
-	}
-	return
-}
-
-var wg sync.WaitGroup
-
-var data int = 0
-var flag bool = false
-
-func write() {
-	data = 42   // 写数据
-	flag = true // 发信号
-}
-
-func read() {
-	if flag && data == 0 {
-		panic(123)
-	}
-}
-
-func TestTest(t *testing.T) {
-	for i := 0; i < 10_000_000; i++ {
-		data = 0
-		flag = false
-
-		wg.Add(2)
-
-		go func() {
-			defer wg.Done()
-			write()
-		}()
-
-		go func() {
-			defer wg.Done()
-			read()
-		}()
-
-		wg.Wait()
-	}
-}
+//func TestSDP(t *testing.T) {
+//	fmt.Println(GenSDP())
+//}
+//
+//func TestSessionID(t *testing.T) {
+//	payload := bytes.NewBufferString(fmt.Sprintf(`{"type":"offer","sdp":%s}`, GenSDP()))
+//	resp, err := http.Post("https://192.168.10.204:/offer", "application/json", payload)
+//	if err != nil {
+//		fmt.Println("Error posting data:", err)
+//		return
+//	}
+//	defer resp.Body.Close()
+//
+//	body, err := io.ReadAll(resp.Body)
+//	if err != nil {
+//		fmt.Println("Error reading response body:", err)
+//		return
+//	}
+//
+//	fmt.Println("Response Status:", resp.Status)
+//	fmt.Println("Response Body:", string(body))
+//}

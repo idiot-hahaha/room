@@ -7,6 +7,7 @@ import (
 	"danmaku/danmaku_reply/model"
 	"fmt"
 	"github.com/gorilla/websocket"
+	"github.com/robfig/cron/v3"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log"
@@ -25,20 +26,24 @@ type Service struct {
 	config          model.Config
 	dao             *dao.Dao
 	embeddingClient api.EmbeddingServiceClient
+	cron            *cron.Cron
 }
 
 func NewService(c *model.Config) (s *Service, err error) {
-	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(fmt.Sprintf("%s:%d", c.EmbeddingConfig.Host, c.EmbeddingConfig.Port), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
+		log.Printf("connect embed dangling service error: %v\n", err)
 		return nil, err
 	}
 	embeddingClient := api.NewEmbeddingServiceClient(conn)
 	_, err = embeddingClient.Ping(context.Background(), &api.Empty{})
 	if err != nil {
+		log.Printf("Ping embedding service error: %v\n", err)
 		return nil, err
 	}
 	d, err := dao.NewDao(c)
 	if err != nil {
+		log.Printf("init dao error: %v\n", err)
 		return nil, err
 	}
 	s = &Service{
@@ -46,6 +51,7 @@ func NewService(c *model.Config) (s *Service, err error) {
 		embeddingClient: embeddingClient,
 		dao:             d,
 		wsClient:        make(map[string]*websocket.Conn),
+		cron:            cron.New(cron.WithSeconds()),
 	}
 	return
 }
@@ -54,10 +60,11 @@ func (s *Service) Close() (err error) {
 	for _, f := range s.danmakuFetcher {
 		f.Close()
 	}
+	s.cron.Stop()
 	return
 }
 
-func (s *Service) FetchRoomDanmaku(ctx context.Context, userId string, roomId string, platform string, ws *websocket.Conn) (err error) {
+func (s *Service) FetchRoomDanmaku(ctx context.Context, userId string, roomId string, platform string) (err error) {
 	switch platform {
 	case "douyin":
 		s.mu.Lock()
@@ -68,7 +75,7 @@ func (s *Service) FetchRoomDanmaku(ctx context.Context, userId string, roomId st
 			return
 		}
 
-		f, err := NewDouyinLive(s, roomId, ws)
+		f, err := NewDouyinLive(s, roomId)
 		if err != nil {
 			log.Printf("DanmakuFetcher.NewDouyinLive err %v\n", err)
 			return err
@@ -175,6 +182,20 @@ func (s *Service) AddWsConn(ctx context.Context, userID, platform, roomID string
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	key := GenFetcherKey(userID, roomID, platform)
-	s.wsClient[key] = conn
+	if _, ok := s.danmakuFetcher[key]; !ok {
+		return
+	}
+	s.danmakuFetcher[key].AddClientConn(conn)
+	return
+}
+
+func (s *Service) RemoveWsConn(ctx context.Context, userID, platform, roomID string, conn *websocket.Conn) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := GenFetcherKey(userID, roomID, platform)
+	if _, ok := s.danmakuFetcher[key]; !ok {
+		return
+	}
+	s.danmakuFetcher[key].AddClientConn(conn)
 	return
 }

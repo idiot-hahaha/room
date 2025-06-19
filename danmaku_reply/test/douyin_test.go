@@ -17,7 +17,7 @@ import (
 )
 
 func TestNewDouyinLive(t *testing.T) {
-	d, _ := service.NewDouyinLive(nil, "646454278948", nil)
+	d, _ := service.NewDouyinLive(nil, "646454278948")
 	d.Subscribe(func(eventData *new_douyin.Webcast_Im_Message) (err error) {
 		// t.Logf("msg received ,type:%s", eventData.Method)
 		switch eventData.Method {

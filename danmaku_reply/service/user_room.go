@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"danmaku/danmaku_reply/model"
+	"log"
 	"strconv"
 	"sync"
 )
@@ -49,11 +50,31 @@ func (s *Service) RoomsByUserID(ctx context.Context, userID int64) (rooms []mode
 	for i, _ := range rooms {
 		wg.Add(1)
 		go func(idx int) {
-			liveID := strconv.Itoa(int(rooms[idx].RoomID))
-			rooms[idx].Status, _ = s.GetDouyinLiveStatus(liveID)
+			switch rooms[idx].Platform {
+			
+			case model.Douyin:
+				liveID := strconv.Itoa(int(rooms[idx].RoomID))
+				rooms[idx].Status, _ = s.GetDouyinLiveStatus(liveID)
+
+			default:
+			}
 			wg.Done()
 		}(i)
 	}
 	wg.Wait()
 	return
+}
+
+func (s *Service) GetDouyinLiveStatus(liveId string) (ok bool, err error) {
+	d, err := NewDouyinLive(s, liveId)
+	if err != nil {
+		return false, err
+	}
+	result, err := d.getUrl(d.liveurl + d.liveid)
+	if err != nil {
+		return false, err
+	}
+	str := extractMatch(isLiveRegexp, result, 2)
+	log.Printf("直播状态: %v\n", str)
+	return str == "2", nil
 }

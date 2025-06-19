@@ -27,3 +27,9 @@ type DeleteRoomParam struct {
 	RoomID   int64  `json:"room_id"`
 	Platform string `json:"platform"`
 }
+
+type DigitalInfo struct {
+	RoomNumber       string `json:"room_number"`
+	DigitalHumanPort int    `json:"digital_human_port"`
+	ModelStatus      int    `json:"model_status"`
+}

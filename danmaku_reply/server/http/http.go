@@ -3,6 +3,7 @@ package http
 import (
 	"danmaku/danmaku_reply/model"
 	"danmaku/danmaku_reply/service"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"log"
@@ -40,11 +41,13 @@ func (s *Server) handleWebSocket(c *gin.Context) {
 	}
 	defer conn.Close()
 
-	s.service.AddWsConn(c, userID, platform, roomID, conn)
-	if err := s.service.FetchRoomDanmaku(c, userID, roomID, platform, conn); err != nil {
+	//s.service.
+	if err := s.service.FetchRoomDanmaku(c, userID, roomID, platform); err != nil {
 		log.Println("WebSocket fetch room danmaku failed:", err)
 		return
 	}
+	s.service.AddWsConn(c, userID, platform, roomID, conn)
+	defer s.service.Remo
 	log.Printf("New WebSocket connection:userID=%s, platform=%s, room_id=%s\n", userID, platform, roomID)
 
 	for {
@@ -55,11 +58,6 @@ func (s *Server) handleWebSocket(c *gin.Context) {
 		}
 
 		log.Printf("Received message: %s", msg)
-
-		//if err := conn.WriteMessage(websocket.TextMessage, msg); err != nil {
-		//	log.Println("Write error:", err)
-		//	break
-		//}
 	}
 
 }
@@ -83,7 +81,7 @@ func StartServer(s *service.Service, config *model.Config) (h *Server, err error
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		if err := s.FetchRoomDanmaku(c, param.UserID, param.RoomID, param.Platform, nil); err != nil {
+		if err := s.FetchRoomDanmaku(c, param.UserID, param.RoomID, param.Platform); err != nil {
 			log.Printf("FetchRoomDanmaku err %v\n", err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		}
@@ -157,7 +155,7 @@ func StartServer(s *service.Service, config *model.Config) (h *Server, err error
 	})
 
 	go func() {
-		err := router.Run(config.Http.Host)
+		err := router.Run(fmt.Sprintf("%s:%d", config.Http.Host, config.Http.Port))
 		if err != nil {
 			log.Printf("gin router Run err %v\n", err)
 		}

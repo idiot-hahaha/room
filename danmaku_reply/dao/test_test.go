@@ -87,3 +87,32 @@ func TestPing(t *testing.T) {
 	fmt.Printf("响应状态码: %d\n", resp.StatusCode)
 	fmt.Printf("响应内容: %s\n", body)
 }
+
+func NewConfig() (conf *model.Config, err error) {
+	f, err := os.Open("../cmd/config.json")
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+	conf = new(model.Config)
+	if err := json.NewDecoder(f).Decode(&conf); err != nil {
+		panic(err)
+	}
+	return conf, nil
+}
+
+func Test(t *testing.T) {
+	conf, err := NewConfig()
+	if err != nil {
+		t.Error(err)
+	}
+	dao, err := NewDao(conf)
+	if err != nil {
+		t.Fatalf("create Dao err: %v", err)
+	}
+	rooms, err := dao.SelectAllRooms()
+	if err != nil {
+		t.Fatalf("SelectAllRooms err: %v", err)
+	}
+	fmt.Println(rooms)
+}

@@ -31,8 +31,8 @@ const (
 	selectQSByGroupID = "SELECT g.name AS group_name, q.id AS question_id, q.question, a.id AS answer_id, a.content AS answer FROM qa_group g JOIN qa_question q ON q.group_id = g.id JOIN qa_answer a ON a.question_id = q.id WHERE g.id = 1 ORDER BY q.id, a.id;"
 )
 
-func (dao *Dao) SelectMostSimilarQuestionByGroup(groupID int64, embedding []float64) (id int64, content string, distance float64, err error) {
-	err = dao.pgClient.QueryRow(selectMostSimilarQuestionByGroup, float64Slice2String(embedding), groupID).Scan(&id, &content, &distance)
+func (d *Dao) SelectMostSimilarQuestionByGroup(groupID int64, embedding []float64) (id int64, content string, distance float64, err error) {
+	err = d.pgClient.QueryRow(selectMostSimilarQuestionByGroup, float64Slice2String(embedding), groupID).Scan(&id, &content, &distance)
 	if errors.Is(err, sql.ErrNoRows) {
 		return -1, "", -1, nil
 	}

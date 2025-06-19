@@ -11,21 +11,23 @@ import (
 
 func main() {
 	conf := model.NewConfig()
-	service, err := service.NewService(conf)
+	s, err := service.NewService(conf)
 	if err != nil {
 		panic(err)
 	}
-	defer func() {
-		_ = service.Close()
-	}()
+	defer s.Close()
 
-	httpServer, err := http.StartServer(service, conf)
+	httpServer, err := http.StartServer(s, conf)
 	if err != nil {
 		panic(err)
 	}
-	defer func() {
-		_ = httpServer.Close()
-	}()
+	defer httpServer.Close()
+
+	err = s.StartJob()
+	if err != nil {
+		panic(err)
+	}
+	
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
 	for {

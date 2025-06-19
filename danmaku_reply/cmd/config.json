@@ -1,17 +1,31 @@
 {
-  "grpc": {
-    "host": "localhost:50051"
-  },
   "http": {
-    "host": "localhost:8080"
+    "host": "0.0.0.0",
+    "port": 8080
   },
+
   "pg_conf": {
-    "host": "localhost:5432",
+    "host": "localhost",
+    "port": 5432,
     "user": "user",
     "password": "pass",
     "database": "test_db"
   },
-  "": {
 
+  "mysql_conf": {
+    "host": "192.168.10.204",
+    "port": 3306,
+    "user": "root",
+    "password": "1234",
+    "database": "ry-vue"
+  },
+
+  "embedding_config": {
+    "host": "localhost",
+    "port": 50051
+  },
+
+  "digital_config": {
+    "host": "192.168.10.204"
   }
 }

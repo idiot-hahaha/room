@@ -7,6 +7,7 @@ import (
 	"danmaku/danmaku_reply/generated/douyin"
 	"danmaku/danmaku_reply/generated/new_douyin"
 	"danmaku/danmaku_reply/jsScript"
+	"danmaku/danmaku_reply/model"
 	"danmaku/danmaku_reply/utils"
 	"errors"
 	"fmt"
@@ -44,25 +45,27 @@ type EventHandler func(eventData *new_douyin.Webcast_Im_Message) (err error)
 
 // DouyinLive 结构体表示一个抖音直播连接
 type DouyinLive struct {
-	userId        int64
-	ttwid         string
-	roomid        string
-	liveid        string
-	liveurl       string
-	userAgent     string
-	c             *req.Client
-	eventHandlers []EventHandler
-	headers       http.Header
-	buffers       *sync.Pool
-	gzip          *gzip.Reader
-	Conn          *websocket.Conn // 抖音间的直播消息长连接
-	wssurl        string
-	pushid        string
-	isLive        bool // 直播间是否在直播
-	isClose       bool // 结束抓弹幕
-	server        *Service
-	ws            *websocket.Conn
-	runChannel    chan struct{}
+	userId          int64
+	ttwid           string
+	roomid          string
+	liveid          string
+	liveurl         string
+	userAgent       string
+	wssurl          string
+	pushid          string
+	isLive          bool // 直播间是否在直播
+	isClose         bool // 结束抓弹幕
+	headers         http.Header
+	server          *Service
+	c               *req.Client
+	buffers         *sync.Pool
+	gzip            *gzip.Reader
+	Conn            *websocket.Conn // 抖音间的直播消息长连接
+	eventHandlers   []EventHandler  //
+	mu              sync.Mutex
+	frontWsSlice    []*websocket.Conn // 前端获取弹幕恢复情况的长连接
+	digital         *model.DigitalInfo
+	completeChannel chan struct{}
 }
 
 // 正则表达式用于提取 roomID 和 pushID
@@ -77,7 +80,7 @@ const (
 )
 
 // NewDouyinLive 创建一个新的 DouyinLive 实例
-func NewDouyinLive(s *Service, liveid string, ws *websocket.Conn) (*DouyinLive, error) {
+func NewDouyinLive(s *Service, liveid string) (*DouyinLive, error) {
 	ua := utils.RandomUserAgent()
 	c := req.C().SetUserAgent(ua)
 	d := &DouyinLive{
@@ -91,10 +94,10 @@ func NewDouyinLive(s *Service, liveid string, ws *websocket.Conn) (*DouyinLive, 
 			New: func() interface{} {
 				return &bytes.Buffer{}
 			}},
-		isClose:    false,
-		server:     s,
-		ws:         ws,
-		runChannel: make(chan struct{}),
+		isClose:         false,
+		server:          s,
+		frontWsSlice:    make([]*websocket.Conn, 0),
+		completeChannel: make(chan struct{}),
 	}
 
 	// 获取 ttwid
@@ -286,7 +289,7 @@ func (d *DouyinLive) Start() {
 	var pbResp = &new_douyin.Webcast_Im_Response{}
 	var pbAck = &new_douyin.Webcast_Im_PushFrame{}
 	// 订阅事件
-	d.Subscribe(printMsg)
+	//d.Subscribe(printMsg)
 	d.Subscribe(d.ReplyDanmaku)
 	for d.isLive && !d.isClose {
 		messageType, message, err := d.Conn.ReadMessage()
@@ -339,18 +342,12 @@ func (d *DouyinLive) Start() {
 			}
 		}
 	}
-	d.runChannel <- struct{}{}
+	d.completeChannel <- struct{}{}
 }
 
 // Close 停止抓弹幕
 func (d *DouyinLive) Close() (err error) {
 	d.isClose = true
-	if d.ws != nil {
-		select {
-		case <-d.runChannel:
-		}
-		d.ws.Close()
-	}
 	return
 }
 
@@ -491,44 +488,54 @@ func (d *DouyinLive) ReplyDanmaku(eventData *new_douyin.Webcast_Im_Message) (err
 			if err != nil {
 				return
 			}
-
-			if err = d.server.SendReplyToTTS(ctx, reply); err != nil {
-				return
-			}
-
-			if d.ws != nil {
-				err = d.ws.WriteJSON(struct {
-					Question      string `json:"question"`
-					MatchQuestion string `json:"match_question"`
-					Answer        string `json:"answer"`
-				}{
-					Question:      chatMsg.Content,
-					MatchQuestion: matchQuestion,
-					Answer:        reply,
-				})
-				if err != nil {
-					log.Println("Send err:", err)
-					return nil
-				}
-			}
 			log.Printf("question:%s, metch_question:%s, reply:%s", chatMsg.Content, matchQuestion, reply)
 
+			go func() {
+				if err = d.server.SendReplyToTTS(ctx, reply); err != nil {
+					log.Printf("send reply to tts err: %v\n", err)
+					return
+				}
+			}()
+
+			d.mu.Lock()
+			defer d.mu.Unlock()
+			for _, ws := range d.frontWsSlice {
+				if ws != nil {
+					go func(conn *websocket.Conn) {
+						err = conn.WriteJSON(struct {
+							Question      string `json:"question"`
+							MatchQuestion string `json:"match_question"`
+							Answer        string `json:"answer"`
+						}{
+							Question:      chatMsg.Content,
+							MatchQuestion: matchQuestion,
+							Answer:        reply,
+						})
+						if err != nil {
+							log.Println("Send err:", err)
+						}
+					}(ws)
+				}
+			}
 			return
 		}
 	}
 	return
 }
 
-func (s *Service) GetDouyinLiveStatus(liveId string) (ok bool, err error) {
-	d, err := NewDouyinLive(s, liveId, nil)
-	if err != nil {
-		return false, err
+func (d *DouyinLive) AddClientConn(ws *websocket.Conn) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.frontWsSlice = append(d.frontWsSlice, ws)
+}
+
+func (d *DouyinLive) RemoveClientConn(ws *websocket.Conn) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	for i, conn := range d.frontWsSlice {
+		if conn == ws {
+			d.frontWsSlice[i] = d.frontWsSlice[len(d.frontWsSlice)-1]
+			d.frontWsSlice = d.frontWsSlice[:len(d.frontWsSlice)-1]
+		}
 	}
-	result, err := d.getUrl(d.liveurl + d.liveid)
-	if err != nil {
-		return false, err
-	}
-	str := extractMatch(isLiveRegexp, result, 2)
-	log.Printf("直播状态: %v\n", str)
-	return str == "2", nil
 }
